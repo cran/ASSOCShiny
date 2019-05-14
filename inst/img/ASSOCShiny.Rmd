@@ -1,0 +1,522 @@
+---
+title: "Association Rule Mining"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(shinyMatrix)
+library(plotly)
+
+library(arules)
+```
+
+
+
+```{r,echo=FALSE}
+sidebarPanel(
+inputPanel(
+
+  
+checkboxInput("ex","Uncheck if you want to use your dataset",value = TRUE),
+fileInput("file", "Upload the *.csv file with headers"),
+selectInput("format","Choose format of the dataset",choices = c("matrix","database"),selected = "database"),
+uiOutput("vx"),
+  uiOutput("vy")
+
+),
+inputPanel(
+
+numericInput("support","Enter minimum support ratio",value = 0.2,step = 0.01),
+numericInput("confidence","Enter minimum confidenc ratio", value = 0.5,step =0.01),
+numericInput("minlen","Enter minimum length", value = 2,step =1,min = 2),
+numericInput("nrules","Enter how many rules", value = 1,step =1)
+
+),
+inputPanel(
+  numericInput("nitems","Enter how many items", value = 1,step =1),
+  downloadButton("downloadPlot", "Download ItemFrequency Plot")
+),
+inputPanel(
+numericInput("nshelfs","Enter how many shelfs", value = 2,step =1),
+downloadButton("downloadPlot2", "Download ItemShelfPlot")
+)
+)
+mainPanel(
+  h6("Enter the Item Names (on the first row margin) and transactionID(on the first column),Edit the binary values between"),
+uiOutput("mat"),
+numericInput("nrows","Enter number of transactions",value = 2),
+numericInput("ncols","Enter number of items", value = 3),
+downloadButton("downloaddata", "Download Dataset in  Matrix Format"),
+br(),
+br(),
+tabsetPanel(type = "tab",
+              tabPanel("Rules",verbatimTextOutput("AssRules")),
+              tabPanel("Rules-Visuals",plotlyOutput("AssRulesV")),
+              tabPanel("ItemFrequencyPlot",plotOutput("ItemFP")),
+              tabPanel("Shelf-Design",plotOutput("AffV"))
+               )
+
+               
+)
+h6("", tags$img(src ="K.JPG", height= 400, width=400))
+
+
+
+
+output$mat <- renderUI({
+     matrixInput(
+       "myMatrix",
+       value = matrix(c(1,0,0,1,0,0),input$nrows,input$ncols),
+
+       rows = list(names= TRUE,editableNames = TRUE),
+       cols = list( names = TRUE,editableNames = TRUE),
+       copy = TRUE,
+       paste = TRUE,
+       class = 'numeric'
+     )
+   })
+output$AssRules <- renderPrint({
+  
+     
+     
+  
+     CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+     row.names(CT) = row.names(input$myMatrix)
+     colnames(CT) = colnames(input$myMatrix)
+
+     
+     if(input$ex == TRUE)    
+     {   txn = as(CT, "transactions")
+     
+      
+
+cat(sprintf("\n The details of the rules formed are as follows\n"))
+rules =  arules::apriori(txn,parameter = list(support = input$support, confidence= input$confidence,minlen = input$minlen,target = "rules"))
+arules::inspect(head(sort(rules,by = "lift"),n =input$nrules))
+
+     
+     }
+     
+     else
+     {
+      
+       if(input$format == "matrix" && input$ex == FALSE)
+       {
+          file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         ds =  data.frame(data)
+         CT = as.matrix(ds)
+        txn = as(CT, "transactions")
+        
+
+cat(sprintf("\n The details of the rules formed are as follows\n"))
+rules = arules::apriori(txn,parameter = list(support= input$support, confidence= input$confidence,minlen = input$minlen,target = "rules"))
+arules::inspect(head(sort(rules,by = "lift"),n =input$nrules))
+
+       }
+       else
+       {
+       if(input$format == "database" && input$ex == FALSE)
+       {
+         file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         indexproduct= grep(input$variablex, colnames(data))
+         indextrans= grep(input$variabley, colnames(data))
+         splitdataset = split(data[,indexproduct],data[,indextrans])
+         txn = as(splitdataset,"transactions")
+         
+
+cat(sprintf("\n The details of the rules formed are as follows\n"))
+rules = arules:: apriori(txn,parameter = list(support = input$support, confidence= input$confidence,minlen = input$minlen,target = "rules"))
+arules::inspect(head(sort(rules,by = "lift"),n =input$nrules))
+
+       } 
+       }
+     }
+     
+
+    
+
+     
+   })
+
+output$AssRulesV <- renderPlotly({
+    CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+     row.names(CT) = row.names(input$myMatrix)
+     colnames(CT) = colnames(input$myMatrix)
+
+     
+     if(input$ex == TRUE)    
+     {   txn = as(CT, "transactions")
+     
+      rules = arules:: apriori(txn,parameter = list(support = input$support, confidence = input$confidence,minlen = input$minlen,target = "rules"))
+arulesViz::plotly_arules(head(sort(rules,by = "lift"),n =input$nrules))
+     
+     }
+     
+     else
+     {
+      
+       if(input$format == "matrix" && input$ex == FALSE)
+       {
+          file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         ds =  data.frame(data)
+         CT = as.matrix(ds)
+        txn = as(CT, "transactions")
+        
+rules = arules:: apriori(txn,parameter = list(support = input$support, confidence = input$confidence,minlen = input$minlen,target = "rules"))
+arulesViz::plotly_arules(head(sort(rules,by = "lift"),n =input$nrules))
+       }
+       else
+       {
+       if(input$format == "database" && input$ex == FALSE)
+       {
+         file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         indexproduct= grep(input$variablex, colnames(data))
+         indextrans= grep(input$variabley, colnames(data))
+         splitdataset = split(data[,indexproduct],data[,indextrans])
+         txn = as(splitdataset,"transactions")
+         
+rules = arules::apriori(txn,parameter = list(support = input$support, confidence = input$confidence,minlen = input$minlen,target = "rules"))
+arulesViz::plotly_arules(head(sort(rules,by = "lift"),n =input$nrules))
+       } 
+       }
+     }
+     
+
+
+
+  
+   })
+
+output$ItemFP <- renderPlot({
+    CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+     row.names(CT) = row.names(input$myMatrix)
+     colnames(CT) = colnames(input$myMatrix)
+
+     
+     if(input$ex == TRUE)    
+     {   txn = as(CT, "transactions")
+     
+    
+  arules::itemFrequencyPlot(txn, topN=input$nitems, type="absolute", main="Item Frequency")   
+     }
+     
+     else
+     {
+      
+       if(input$format == "matrix" && input$ex == FALSE)
+       {
+          file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         ds =  data.frame(data)
+         CT = as.matrix(ds)
+        txn = as(CT, "transactions")
+        
+
+arules::itemFrequencyPlot(txn, topN=input$nitems, type="absolute", main="Item Frequency") 
+       }
+       else
+       {
+       if(input$format == "database" && input$ex == FALSE)
+       {
+         file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         indexproduct= grep(input$variablex, colnames(data))
+         indextrans= grep(input$variabley, colnames(data))
+         splitdataset = split(data[,indexproduct],data[,indextrans])
+         txn = as(splitdataset,"transactions")
+         
+
+arules::itemFrequencyPlot(txn, topN=input$nitems, type="absolute", main="Item Frequency") 
+       } 
+       }
+     }
+     
+
+
+
+  
+   })
+
+
+output$AffV <- renderPlot({
+  CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+     row.names(CT) = row.names(input$myMatrix)
+     colnames(CT) = colnames(input$myMatrix)
+
+     
+     if(input$ex == TRUE)    
+     {   txn = as(CT, "transactions")
+     
+      
+ distance = arules::dissimilarity(txn,which = "items",method = "dice")
+fit = hclust(distance,method = "ward.D")
+plot(fit,main = "Dendogram of items")
+rect.hclust(fit,k=input$nshelfs,border = "red")
+ 
+     }
+     
+     else
+     {
+      
+       if(input$format == "matrix" && input$ex == FALSE)
+       {
+          file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         ds =  data.frame(data)
+         CT = as.matrix(ds)
+        txn = as(CT, "transactions")
+        
+
+
+distance = arules::dissimilarity(txn,which = "items",method = "dice")
+fit = hclust(distance,method = "ward.D")
+plot(fit,main = "Dendogram of items")
+rect.hclust(fit,k=input$nshelfs,border = "red")
+ 
+       }
+       else
+       {
+       if(input$format == "database" && input$ex == FALSE)
+       {
+         file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         indexproduct= grep(input$variablex, colnames(data))
+         indextrans= grep(input$variabley, colnames(data))
+         splitdataset = split(data[,indexproduct],data[,indextrans])
+         txn = as(splitdataset,"transactions")
+         
+
+distance = arules::dissimilarity(txn,which = "items",method = "dice")
+fit = hclust(distance,method = "ward.D")
+plot(fit,main = "Dendogram of items")
+rect.hclust(fit,k=input$nshelfs,border = "red")
+       } 
+       }
+     }
+      
+
+
+   })
+     
+ datasetInput1 <- reactive({
+  CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+  row.names(CT) = row.names(input$myMatrix)
+  colnames(CT) = colnames(input$myMatrix)
+  dataset =  data.frame(CT)
+ 
+     
+})
+output$downloaddata <- downloadHandler(
+    filename = function() {
+      filetitle = paste("dataset")
+      paste(filetitle, ".csv", sep = "")
+    },
+    content = function(file) {
+      
+      write.csv(datasetInput1(), file, row.names = FALSE)
+    }
+  )
+
+
+output$vx <- renderUI({
+   
+ 
+     
+     file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+    
+     
+     if(input$format == "database")
+   { selectInput("variablex","Select the ItemID column",choices =   
+                   colnames(data),selected = colnames(data))}
+    
+    
+  
+
+
+  })
+output$vy <- renderUI({
+   
+ 
+     
+     file1 = input$file
+     if(is.null(file1)){return()}
+     
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+    
+     ds = dplyr:: select(data,-c(input$variablex))
+     
+     
+     if(input$format == "database")
+   { selectInput("variabley","Select the Transaction ID column",choices =   
+                   colnames(ds),selected = colnames(ds))}
+    
+  
+
+  })
+
+
+
+
+
+output$downloadPlot<- downloadHandler(
+    filename = function() {
+      paste("ItemFrequencyPlot", ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)
+ CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+     row.names(CT) = row.names(input$myMatrix)
+     colnames(CT) = colnames(input$myMatrix)
+
+     
+     if(input$ex == TRUE)    
+     {   txn = as(CT, "transactions")
+     
+      
+arules::itemFrequencyPlot(txn, topN=input$nitems, type="absolute", main="Item Frequency") 
+     
+     }
+     
+     else
+     {
+      
+       if(input$format == "matrix" && input$ex == FALSE)
+       {
+          file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         ds =  data.frame(data)
+         CT = as.matrix(ds)
+        txn = as(CT, "transactions")
+        
+
+arules::itemFrequencyPlot(txn, topN=input$nitems, type="absolute", main="Item Frequency") 
+       }
+       else
+       {
+       if(input$format == "database" && input$ex == FALSE)
+       {
+         file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         indexproduct= grep(input$variablex, colnames(data))
+         indextrans= grep(input$variabley, colnames(data))
+         splitdataset = split(data[,indexproduct],data[,indextrans])
+         txn = as(splitdataset,"transactions")
+         
+
+arules::itemFrequencyPlot(txn, topN=input$nitems, type="absolute", main="Item Frequency") 
+       } 
+       }
+     }
+     
+
+
+
+       
+      dev.off()
+    }
+    )
+
+
+
+
+output$downloadPlot2<- downloadHandler(
+    filename = function() {
+      paste("ItemShelfPlot", ".png", sep = "")
+    },
+    content = function(file) {
+      png(file)
+ CT =  matrix(input$myMatrix,nrow = input$nrows, ncol = input$ncols)
+     row.names(CT) = row.names(input$myMatrix)
+     colnames(CT) = colnames(input$myMatrix)
+
+     
+     if(input$ex == TRUE)    
+     {   txn = as(CT, "transactions")
+     
+      
+distance = arules::dissimilarity(txn,which = "items",method = "dice")
+fit = hclust(distance,method = "ward.D")
+plot(fit,main = "Dendogram of items")
+rect.hclust(fit,k=input$nshelfs,border = "red")
+     
+     }
+     
+     else
+     {
+      
+       if(input$format == "matrix" && input$ex == FALSE)
+       {
+          file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         ds =  data.frame(data)
+         CT = as.matrix(ds)
+        txn = as(CT, "transactions")
+        
+
+distance = arules::dissimilarity(txn,which = "items",method = "dice")
+fit = hclust(distance,method = "ward.D")
+plot(fit,main = "Dendogram of items")
+rect.hclust(fit,k=input$nshelfs,border = "red") 
+       }
+       else
+       {
+       if(input$format == "database" && input$ex == FALSE)
+       {
+         file1 = input$file
+     if(is.null(file1)){return()}
+     data =  read.table(file =  file1$datapath,sep =",",header = TRUE)
+     if(is.null(data())){return()}
+         indexproduct= grep(input$variablex, colnames(data))
+         indextrans= grep(input$variabley, colnames(data))
+         splitdataset = split(data[,indexproduct],data[,indextrans])
+         txn = as(splitdataset,"transactions")
+         
+
+distance = arules::dissimilarity(txn,which = "items",method = "dice")
+fit = hclust(distance,method = "ward.D")
+plot(fit,main = "Dendogram of items")
+rect.hclust(fit,k=input$nshelfs,border = "red")
+       } 
+       }
+     }
+     
+
+
+
+       
+      dev.off()
+    }
+    )
